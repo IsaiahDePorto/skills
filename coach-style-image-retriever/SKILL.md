@@ -57,7 +57,7 @@ Construct the image asset URL using the following format:
 ```
 https://images.coach.com/is/image/Coach/[style-number]_[color-code-without-slash]_[angle-suffix]
 ```
-*Note: Ensure any slashes (`/`) present in the color code are stripped (e.g., `IM/BLK` -> `IMBLK`).*
+*Note: Ensure any slashes (`/`) present in the color code are stripped (e.g., `IM/BLK` -> `IMBLK`). and ensure that the style number and color code are entirely lowercase in the URL*
 
 ### B. Camera Angle Taxonomy
 The suffix at the end of the URL maps to the designated camera angle of the product asset:
