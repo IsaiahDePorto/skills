@@ -1,36 +1,47 @@
 ---
 name: coach-catalog-intelligence
-description: Comprehensive technical reference and developer specification for decoding Coach style numbers, constructing Adobe Scene7 Dynamic Media image URLs, probing camera views, reverse-engineering Salesforce Commerce Cloud (SFCC) product pages, and querying Tapestry in-store POS/scan APIs.
+description: Comprehensive technical reference and developer specification for decoding Coach style numbers, constructing Adobe Scene7 Dynamic Media image URLs, probing camera views, reverse-engineering Salesforce Commerce Cloud (SFCC) product pages, querying Tapestry in-store POS/scan APIs, and automating session token minting for live store pricing and clearance (Last Chance) detection.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   author: "Isaiah & Gemini"
 ---
 
 # Coach Catalog Intelligence & Asset Architecture
 
-This skill provides an end-to-end technical reference for decoding Coach product identifiers, constructing high-resolution media assets via Adobe Scene7, reverse-engineering Salesforce Commerce Cloud (SFCC) storefront URLs, and integrating with Tapestry's Point of Sale (POS) and in-store scanner APIs.
+This skill provides an end-to-end technical reference and developer specification for decoding Coach product identifiers, constructing high-resolution media assets via Adobe Scene7, reverse-engineering Salesforce Commerce Cloud (SFCC) storefront URLs, integrating with Tapestry's Point of Sale (POS) and in-store scanner APIs, and programmatically detecting store-level clearance ("Last Chance!") statuses and promotional pricing.
 
 ---
 
-## 1. Core Objectives & Capabilities
+## 1. System Overview & Architectural Topology
 
-1. **Identifier Decoding:** Parse modern, historical (MFF), and boutique delete (Coach Reserve) style numbers alongside compound hardware-color suffixes.
-2. **Dynamic Media Engineering (Adobe Scene7):** Construct valid media URLs, probe camera angle availability without downloading images, extract master-grade 2400×2400 renders, and audit production metadata (EXIF/XMP).
-3. **Storefront Routing (Salesforce Commerce Cloud):** Deconstruct and programmatically generate minimal valid PDP URLs for `coach.com` and `coachoutlet.com`, bypassing cosmetic URL slugs while navigating Akamai Web Application Firewall (WAF) boundaries.
-4. **POS & Inventory Integration (Tapestry Scan API):** Query internal store-level catalog APIs using 12-digit Universal Product Codes (UPCs) to retrieve official item names, taxonomy classes, HTML bullet descriptions, exact Scene7 image indices, and complete sibling size matrices.
+Coach and parent company Tapestry operate across three distinct technical ecosystems, each with unique identifier indexing, security boundaries, and data payloads:
+
+```
++-----------------------------------------------------------------------------------+
+|                               TAPESTRY ECOSYSTEM                                  |
++--------------------------+------------------------------+-------------------------+
+|   Adobe Scene7 CDN       |   Salesforce Commerce Cloud  |  In-Store POS / Scan    |
+|   (images.coach.com)     |   (coach.com / outlet)       |  (app.scan.coach.com)   |
++--------------------------+------------------------------+-------------------------+
+| Index: Style + Color     | Index: Parent Style Number   | Index: 12-Digit UPC     |
+| Assets: Media, Crops,    | Data: MSRP, Measurements,    | Data: POS Name, Dept,   |
+|         XMP EXIF Lineage |       Materials, Strap Drops |       Promos, Clearance |
+| Auth: None (Open CORS)   | Auth: Akamai Bot WAF (403)   | Auth: Anonymous Session |
++--------------------------+------------------------------+-------------------------+
+```
 
 ---
 
-## 2. Structural Parsing Guidelines
+## 2. Identifier Parsing & Classification
 
 ### A. Style Number Classification
 Coach assigns style numbers based on production tier and era:
-1. **Modern Unified Alphanumeric (2020–Present):** Consists of 1 to 3 leading letters followed by 2 to 4 digits (e.g., `C1555`, `CAQ25`, `CCX04`, `CU068`, `CY201`, `CEN85`). This format is shared across retail boutiques, specialty collaborations, and modern factory-exclusive production.
+1. **Modern Unified Alphanumeric (2020–Present):** Consists of 1 to 3 leading letters followed by 2 to 4 digits (e.g., `C1555`, `CAQ25`, `CCX04`, `CU068`, `CY201`, `CEN85`, `CEF29`). This format is shared across retail boutiques, specialty collaborations, and modern factory-exclusive production.
 2. **Historical Factory / Outlet (MFF):** Typically begins with an `F` prefix followed by 5 digits (e.g., `F58292`).
-3. **Boutique Deletes (Coach Reserve):** Retain their original boutique style number (e.g., `CCX04`), but are reassigned to outlet channels when retail inventory is transferred.
+3. **Boutique Deletes (Coach Reserve):** Retain their original boutique style number (e.g., `CCX04`), but are reassigned to outlet inventory when transferred.
 
 ### B. Hardware Finish Codes (Prefix - 2 Characters)
-Coach compound color codes typically prepend a 2-character hardware plating finish to the material color code:
+Coach compound color codes prepend a 2-character hardware plating finish to the material color code:
 * **`IM`** = Imitation Gold (High-gloss polished brass; standard on factory/outlet items)
 * **`SV`** = Silver (Polished nickel/chrome plating)
 * **`LH`** = Light Gold (Champagne gold; softer hue used in boutiques and elevated outlet pieces)
@@ -41,10 +52,11 @@ Coach compound color codes typically prepend a 2-character hardware plating fini
 * **`DK`** = Dark Gunmetal / Dark Pewter
 
 ### C. Material & Pattern Color Codes (Suffix - 2 to 5 Characters)
-Appended directly to the hardware prefix (either directly or separated by a slash `/` on hangtags):
+Appended directly to the hardware prefix (either joined directly or separated by a slash `/` on retail tags):
 * **`BK` / `BLK`** = Black
 * **`MPL`** = Maple (Deep rich brown)
 * **`OPI`** = Optic White
+* **`UPZ`** = Natural Raffia / Straw
 * **`HA` / `CHK`** = Chalk / Off-White
 * **`SAD` / `SADDL`** = Saddle Brown
 * **`MID`** = Midnight Navy
@@ -58,10 +70,10 @@ Appended directly to the hardware prefix (either directly or separated by a slas
 
 ### D. Formatting Rules for System Inputs
 * **For Adobe Scene7 Image URLs:** Strip all slashes (`/`), remove whitespace, and convert the entire string to lowercase:
-  * Example: Style `CCX04`, Color `B4/MPL` $\rightarrow$ `ccx04_b4mpl`.
-* **For Salesforce Commerce Cloud (coach.com):** Preserve case (usually uppercase), convert spaces to `+`, and URL-encode the forward slash as `%2F`:
-  * Example: `CCX04` + `B4/BK` $\rightarrow$ `?frp=CCX04+B4%2FBK`.
-  * If unslashed: `CU068` + `B4MPL` $\rightarrow$ `?frp=CU068+B4MPL`.
+  * Style `CCX04`, Color `B4/MPL` $\rightarrow$ `ccx04_b4mpl`.
+* **For Salesforce Commerce Cloud (coach.com):** Preserve case (uppercase), convert spaces to `+`, and URL-encode the forward slash as `%2F`:
+  * Slashed: `CCX04` + `B4/BK` $\rightarrow$ `?frp=CCX04+B4%2FBK`.
+  * Unslashed: `CU068` + `B4MPL` $\rightarrow$ `?frp=CU068+B4MPL`.
 
 ---
 
@@ -87,7 +99,7 @@ https://images.coach.com/is/image/Coach/[style-number]_[color-code]_[angle-suffi
 * **`_swatch`:** Dedicated square texture/color swatch tile used in PDP variant selectors.
 
 #### 2. Footwear & Shoes
-*(Note: Footwear deviates significantly from handbag numbering. Profile, sole, and collar views utilize non-sequential codes.)*
+*(Note: Footwear deviates completely from handbag numbering. Profile, sole, and collar views utilize non-sequential codes.)*
 * **`_a0`:** Primary hero shot (exterior side profile of single shoe).
 * **`_a3`:** Top-down view into collar, insole branding, and footbed.
 * **`_a8`:** Lateral side view / profile.
@@ -111,10 +123,10 @@ https://images.coach.com/is/image/Coach/[style-number]_[color-code]_[angle-suffi
 
 ### C. Advanced Scene7 Protocol Commands (`req=`)
 
-Because Coach hosts assets on Adobe Dynamic Media, appending `req=` query parameters exposes powerful backend functions:
+Appending `req=` query parameters exposes powerful origin-level Adobe Dynamic Media functions:
 
 #### 1. Lightweight Angle Probing (`?req=exists`)
-To avoid broken images and eliminate client-side `404 Not Found` network noise, probe an asset before rendering:
+To eliminate broken image links and eliminate client-side `404 Not Found` network errors, probe an asset before rendering:
 ```
 https://images.coach.com/is/image/Coach/ccx04_b4mpl_a92?req=exists
 ```
@@ -125,7 +137,7 @@ https://images.coach.com/is/image/Coach/ccx04_b4mpl_a92?req=exists
   catalogRecord.exists=1
   ```
 * If the view exists: `catalogRecord.exists=1`.
-* If the view does not exist: `catalogRecord.exists=0` (HTTP 200 is still returned; parse the integer value).
+* If the view does not exist: `catalogRecord.exists=0` (HTTP 200 is returned; parse the integer value).
 
 #### 2. Production Lineage & Retouching Audit (`?req=xmp`)
 ```
@@ -182,18 +194,18 @@ Coach runs on Salesforce Commerce Cloud (`coach.com` and `coachoutlet.com`). Whi
   `https://www.coach.com/products/CY201.html?frp=CY201+B4%2FBK`
   *(or simply `https://www.coach.com/products/CY201.html` to load the default hero variant)*
 
-### B. What Can Be Extracted from the PDP
-By resolving the minimal URL, the following data points can be extracted:
+### B. Extracted PDP Metadata
+Resolving the minimal URL yields:
 1. **Full Retail Name & MSRP:** e.g., "Tabby Shoulder Bag 20", "$375".
 2. **Physical Dimensions:** Length, height, width in inches and centimeters.
 3. **Strap & Handle Drops:** Specific drop measurements for short handles vs. crossbody straps.
 4. **Materials & Lining:** e.g., "Natural grain leather", "Fabric lining".
 5. **Closure & Pocket Architecture:** Zipper, snap, magnetic closures, and interior/exterior slip configurations.
-6. **Full Variant Sibling List:** Extracts every available colorway code and swatch for that parent silhouette.
+6. **Full Variant Sibling List:** Every available colorway code and swatch for that parent silhouette.
 
-### C. Anti-Bot / WAF Scraping Boundaries
-* **The Constraint:** `coach.com` and `coachoutlet.com` enforce strict Akamai Bot Manager WAF policies. Automated HTTP requests via plain cURL, Python `requests`, or Node.js `fetch` will receive an immediate `403 Forbidden`.
-* **The Solution:** Programmatic retrieval must run through a headless browser (Puppeteer, Playwright), a residential proxy gateway, or a dedicated reader/rendering service (such as Jina Reader).
+### C. Anti-Bot / WAF Boundaries
+* `coach.com` and `coachoutlet.com` enforce strict Akamai Bot Manager policies. Standard HTTP requests via cURL, Python `requests`, or Node.js `fetch` receive `403 Forbidden`.
+* Programmatic retrieval must run through a headless browser (Playwright, Puppeteer), a residential proxy gateway, or a dedicated reader/rendering service (such as Jina Reader).
 * **Discontinued / Sold-Out Items:** On `coachoutlet.com`, older styles (e.g., `C9926`) that are fully delisted redirect to a generic 404 page ("Woops! We couldn't find that page"). In contrast, **Adobe Scene7 retains images indefinitely**, even after items are wiped from the public web catalog.
 
 ---
@@ -213,7 +225,7 @@ GET https://app.scan.coach.com/api/iteminfo/catalogs/coach-us/stores/{storeId}/i
 * `{storeId}`: The 4-digit store code (e.g., `4501` for Coach Kittery).
 * `{itemId}`: **MUST be a 12-digit UPC barcode.**
 
-#### Critical Architecture Discovery:
+#### Critical Architecture Behavior:
 * **Querying by Style + Color (e.g., `CY201`, `cfk02_immpl`):** The API returns HTTP `200 OK`, but **every field in the JSON payload is `null`**. The POS database is strictly indexed by physical inventory barcodes.
 * **Querying by 12-Digit UPC (e.g., `196395712960`):** Returns the complete item record:
   ```json
@@ -250,7 +262,7 @@ GET https://app.scan.coach.com/api/iteminfo/catalogs/coach-us/stores/{storeId}/i
 #### Extracted POS Fields:
 * `productName`: Standard retail naming schema including style, color, size, and width (e.g., `SOHO SNKR-OPI-7   B`).
 * `departmentNumber`: Internal merchandising department (e.g., `11` = Footwear, `01` / `02` = Handbags/Accessories).
-* `itemClass`: POS merchandise subclass (e.g., `305`).
+* `itemClass`: POS merchandise subclass (e.g., `305`, `257`).
 * `productDescription`: Unsanitized raw HTML containing official bullet-point materials, lining, sole composition, and construction features.
 * `imageURL`: Exact array of all available Scene7 asset paths, explicitly revealing all active camera angles.
 * `variationGroup`: The parent style-color family identifier (e.g., `CAQ25-OPI`).
@@ -269,24 +281,121 @@ By supplying a single valid UPC (`itemId`), this endpoint returns the **complete
 
 ---
 
-### C. In-Store Pricing Endpoint (`priceinfo`)
+### C. In-Store Pricing & Session Token Minting
+
+The pricing route requires an `Authorization: Bearer <token>` header:
 ```
 POST https://app.scan.coach.com/api/priceinfo/catalogs/coach-us/stores/{storeId}/items/{itemId}
 ```
-* **Payload Requirements:**
-  ```json
-  {
-    "couponNum": [],
-    "isLoggedIn": "false",
-    "userAppliedCouponNum": "",
-    "personalizedPromosList": []
-  }
-  ```
-* **Authentication Boundary:** Unlike `iteminfo` (which is open for GET requests), `priceinfo` enforces associate authentication. It checks for a `STORE_TOKEN` header generated when store personnel authenticate with an associate PIN at `/api/validatepin/catalogs/coach-us/stores/{storeId}`. Unauthenticated calls yield HTTP 400/405 errors.
+
+#### Anonymous Token Minting via Empty PIN:
+In many stores (including store `4501`), store PIN validation is disabled (`pinActivatedInStore: false`). A valid session token can be minted anonymously:
+
+1. **Mint Token:**
+   * **URL:** `POST https://app.scan.coach.com/api/validatepin/catalogs/coach-us/stores/{storeId}`
+   * **Payload:** `{"storeId": "{storeId}", "pin": ""}`
+   * **Response:**
+     ```json
+     {
+       "pinActivatedInStore": false,
+       "pinNotExistsForDuration": false,
+       "storeId": "4501",
+       "token": "XzA83N6eoj3Kq5M1mF/B5iqmnQ/brh3vEsc5AGRWGNM=",
+       "valid": true
+     }
+     ```
+2. **Execute Pricing Query:**
+   Pass the returned token in the `Authorization: Bearer {token}` header to `/api/priceinfo/...` with payload:
+   ```json
+   {
+     "couponNum": [],
+     "isLoggedIn": "false",
+     "userAppliedCouponNum": "",
+     "personalizedPromosList": []
+   }
+   ```
 
 ---
 
-## 6. Cross-System Identifier & Data Resolution Matrix
+## 6. Clearance & "Last Chance!" Badge Detection Engine
+
+### A. Reverse-Engineered Frontend Rendering Logic
+Inside `scan.coach.com`'s core UI chunk (`9.[hash].chunk.js`), the clearance badge is governed by a strict array membership check on `itemGroups`:
+
+```javascript
+// e is the itemPriceInfo object returned by /api/priceinfo/...
+const a = e.itemGroups && Array.isArray(e.itemGroups) && e.itemGroups.includes("2");
+
+return i.a.createElement(
+  "div",
+  { className: "final-price-container " + (e.className || "") },
+  // ... MSRP / Comparable Value ...
+  // ... Current Sale Price ...
+  // ... Percentage Off ...
+  a ? i.a.createElement(
+        "span",
+        { className: "last-chance-badge", "aria-label": "Last Chance!" },
+        "Last Chance!"
+      ) : ""
+);
+```
+
+### B. Tapestry POS Merchandise Hierarchy
+* **`itemGroups.includes("2")`:** Identifies **Clearance / "Last Chance!"** merchandise. Triggers the red UI badge.
+* **`itemGroups: ["5"]`:** Standard mainline outlet / non-clearance inventory.
+* **Clearance Promo Array:** When an item is marked "Last Chance", the `appliedPromotions` array populates with promotional metadata (e.g., `20% OFF LAST CHANCE`), including discount amounts, discount percentages, and promotion IDs.
+
+### C. Live Pricing Payload Reference (Clearance Item `198685143560`)
+```json
+{
+  "appliedPromotions": [
+    {
+      "couponId": "",
+      "discountAMT": 23.1,
+      "discountPCT": 20.0,
+      "discountType": "PCT_",
+      "displayName": "20% OFF LAST CHANCE",
+      "myoffer": false,
+      "priceAfterPromo": 92.4,
+      "promoNameTranslations": {
+        "en-us": "20% Off Last Chance",
+        "es": "20% OFF LAST CHANCE",
+        "fr": "20% OFF LAST CHANCE",
+        "ko": "20% OFF LAST CHANCE",
+        "pt": "20% OFF LAST CHANCE",
+        "zh": "20% OFF LAST CHANCE"
+      },
+      "promotionId": "200171",
+      "promotionType": "TTHR"
+    }
+  ],
+  "brand": "Coach",
+  "itemGroups": [
+    "2",
+    "5"
+  ],
+  "itemId": "198685143560",
+  "itemSalePrice": 115.5,
+  "mfsrp": 165.0,
+  "pdpsalePrice": 92.4,
+  "savingsAmount": 72.6,
+  "savingsPCT": 44.0,
+  "storeNumber": "4501"
+}
+```
+
+#### Field Mappings:
+* `mfsrp`: Comparable Value / Original MSRP ($165.00)
+* `itemSalePrice`: Base store sale price before extra promos ($115.50)
+* `pdpsalePrice`: Final checkout price after promotions ($92.40)
+* `savingsAmount`: Total dollar savings ($72.60)
+* `savingsPCT`: Total percentage discount (44% OFF)
+* `itemGroups`: Contains `"2"` $\rightarrow$ **Last Chance! Flag = TRUE**
+* `appliedPromotions[0].displayName`: Promotion label ("20% OFF LAST CHANCE")
+
+---
+
+## 7. Unified Cross-System Resolution Matrix
 
 | Target Information | Required Minimal Input | Target Endpoint | Bot/WAF / Auth Restrictions |
 | :--- | :--- | :--- | :--- |
@@ -297,4 +406,90 @@ POST https://app.scan.coach.com/api/priceinfo/catalogs/coach-us/stores/{storeId}
 | **Official MSRP, Dimensions, Straps** | Style Number (`CY201`) + optional Color (`B4%2FBK`) | `https://www.coach.com/products/[STYLE].html?frp=[STYLE]+[COLOR]` | **Akamai WAF.** Requires headless browser or scraping gateway. **No slug needed.** |
 | **POS Name, Class, Dept, Bullet Specs** | 12-Digit UPC (`196395712960`) + Store (`4501`) | `https://app.scan.coach.com/api/iteminfo/catalogs/coach-us/stores/[store]/items/[upc]` | **None.** Direct JSON GET. Style+Color combo yields `null`. |
 | **Full Sibling Size Matrix & UPCs** | Single 12-Digit UPC (`196395712960`) + Store | `https://app.scan.coach.com/api/iteminfo/catalogs/coach-us/stores/[store]/retrive-similar-items/[upc]` | **None.** Direct JSON GET. Reconstructs all sibling sizes/UPCs. |
-| **Store-Level Pricing & Promos** | 12-Digit UPC + Store | `https://app.scan.coach.com/api/priceinfo/catalogs/coach-us/stores/[store]/items/[upc]` | **Auth Required.** POST request requiring `STORE_TOKEN` from PIN login. |
+| **Store Pricing & "Last Chance" Status** | 12-Digit UPC + Store | `https://app.scan.coach.com/api/priceinfo/catalogs/coach-us/stores/[store]/items/[upc]` | **Auth Required.** POST request requiring token minted via `/validatepin` with empty PIN. |
+
+---
+
+## 8. Reference Implementation (Python Client)
+
+```python
+import urllib.request
+import json
+
+class CoachCatalogClient:
+    def __init__(self, store_id: str = "4501", catalog: str = "coach-us"):
+        self.store_id = store_id
+        self.catalog = catalog
+        self.base_url = "https://app.scan.coach.com/api"
+        self._token = None
+
+    def get_token(self) -> str:
+        """Mints an anonymous session token using store empty PIN validation."""
+        if self._token:
+            return self._token
+        url = f"{self.base_url}/validatepin/catalogs/{self.catalog}/stores/{self.store_id}"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps({"storeId": self.store_id, "pin": ""}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            self._token = data.get("token")
+            return self._token
+
+    def get_item_info(self, upc: str) -> dict:
+        """Retrieves item metadata, class, department, and Scene7 asset paths."""
+        url = f"{self.base_url}/iteminfo/catalogs/{self.catalog}/stores/{self.store_id}/items/{upc}"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    def get_pricing_and_status(self, upc: str) -> dict:
+        """Retrieves live pricing, savings %, promotions, and Last Chance clearance status."""
+        token = self.get_token()
+        url = f"{self.base_url}/priceinfo/catalogs/{self.catalog}/stores/{self.store_id}/items/{upc}"
+        payload = {
+            "couponNum": [],
+            "isLoggedIn": "false",
+            "userAppliedCouponNum": "",
+            "personalizedPromosList": []
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}"
+            }
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        item_groups = data.get("itemGroups") or []
+        is_last_chance = "2" in item_groups
+        promos = data.get("appliedPromotions") or []
+
+        return {
+            "upc": upc,
+            "is_last_chance": is_last_chance,
+            "comparable_value": data.get("mfsrp"),
+            "sale_price": data.get("pdpsalePrice"),
+            "savings_amount": data.get("savingsAmount"),
+            "savings_pct": round(data.get("savingsPCT", 0)),
+            "promotions": [p.get("displayName") for p in promos]
+        }
+
+    @staticmethod
+    def check_scene7_angle_exists(style: str, color: str, angle: str = "a0") -> bool:
+        """Probes Scene7 for angle existence using the 57-byte check."""
+        clean_style = style.lower()
+        clean_color = color.lower().replace("/", "")
+        url = f"https://images.coach.com/is/image/Coach/{clean_style}_{clean_color}_{angle}?req=exists"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                text = resp.read().decode("utf-8")
+                return "catalogRecord.exists=1" in text
+        except Exception:
+            return False
