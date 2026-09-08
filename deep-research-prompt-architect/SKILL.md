@@ -1,9 +1,9 @@
 ---
 name: deep-research-prompt-architect
-description: Guides the programmatic construction of high-precision prompts for autonomous deep research agents. Enforces strict XML framing, negative boundaries, rigorous investigative question decomposition, anti-hallucination protocols, and explicit epistemic gap handling while banning persona fluff and information prescription. Use this skill whenever dispatching tasks to autonomous research sub-agents, orchestrating background multi-step research loops, or compiling research directives.
+description: Guides the programmatic construction of high-precision prompts for autonomous deep research agents. Enforces strict XML framing, negative boundaries, rigorous investigative question decomposition, anti-hallucination protocols, and explicit epistemic gap handling while banning persona fluff and information prescription. Use this skill whenever dispatching tasks to autonomous research sub-agents, orchestrating background multi-step research loops, compiling research directives, or automating deployment via the GitHub Deep Research Controller.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   architecture: "agent-skills-spec"
 ---
 
@@ -223,3 +223,43 @@ Below is a complete, illustrative example of a prompt written according to this 
     5. Primary Source Ledger
   </required_dossier_structure>
 </research_directive>
+```
+
+---
+
+## 7. Automated Deployment via GitHub Deep Research Controller (Optional)
+
+The environment may provide the **GitHub Deep Research Controller** tool suite connected to the `IsaiahDePorto/Deepresearch` repository.
+
+### 7.1. Execution Precondition & Intent Rules
+- **NEVER assume tool execution by default.** If the user asks to "write a prompt", "design a research directive", or "review research questions", output the structured XML prompt directly into the conversation. DO NOT invoke any controller tools unless specifically instructed.
+- **Trigger Condition (Full Deployment):** If and only if the user explicitly instructs you to push/deploy the prompt AND launch/run the research (e.g., *"push the prompt and start the research"*, *"deploy this to GitHub and trigger the deep research"*, *"send it through the plugin to replace the prompt and kick off the workflow"*), execute the **two-stage tool chain** in direct sequential order:
+
+```
+[User instructs: Deploy & Run]
+          │
+          ▼
+1. overwrite_prompt_markdown(commit_message, content)
+          │
+          ▼ (Verify commit success)
+2. trigger_deep_research_action(branch="main")
+          │
+          ▼
+Report commit SHA & GitHub Actions monitoring link to user
+```
+
+### 7.2. Tool Execution Specifications
+
+1. **Stage 1: Commit Directive (`overwrite_prompt_markdown`)**
+   - **Target File:** Overwrites `Prompt.md` in `IsaiahDePorto/Deepresearch` on branch `main`.
+   - **Parameter `content`:** The complete, unescaped markdown document containing the generated `<research_directive>` XML block.
+   - **Parameter `commit_message`:** A precise, semantic Git commit message describing the target topic (e.g., `feat: deploy deep research directive for [topic]`).
+
+2. **Stage 2: Workflow Dispatch (`trigger_deep_research_action`)**
+   - **Target Workflow:** `deep_research.yml` ("Deep Research") on branch `main`.
+   - **Invocation:** Execute immediately after Stage 1 resolves successfully. Do not wait for user prompting between stages when full deployment was requested.
+
+3. **Stage 3: Verification & Reporting**
+   - Confirm both calls succeeded.
+   - Provide the user with the direct link to the commit and the GitHub Actions dashboard: `https://github.com/IsaiahDePorto/Deepresearch/actions`.
+```
