@@ -2,7 +2,7 @@
 name: coach-catalog-intelligence
 description: Comprehensive technical reference and developer specification for decoding Coach style numbers, constructing Adobe Scene7 Dynamic Media image URLs, probing camera views, reverse-engineering Salesforce Commerce Cloud (SFCC) product pages, querying Tapestry in-store POS/scan APIs, and automating session token minting for live store pricing and clearance (Last Chance) detection.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   author: "Isaiah & Gemini"
 ---
 
@@ -36,20 +36,58 @@ Coach and parent company Tapestry operate across three distinct technical ecosys
 
 ### A. Style Number Classification
 Coach assigns style numbers based on production tier and era:
-1. **Modern Unified Alphanumeric (2020–Present):** Consists of 1 to 3 leading letters followed by 2 to 4 digits (e.g., `C1555`, `CAQ25`, `CCX04`, `CU068`, `CY201`, `CEN85`, `CEF29`). This format is shared across retail boutiques, specialty collaborations, and modern factory-exclusive production.
+1. **Modern Unified Alphanumeric (2020â€“Present):** Consists of 1 to 3 leading letters followed by 2 to 4 digits (e.g., `C1555`, `CAQ25`, `CCX04`, `CU068`, `CY201`, `CEN85`, `CEF29`). This format is shared across retail boutiques, specialty collaborations, and modern factory-exclusive production.
 2. **Historical Factory / Outlet (MFF):** Typically begins with an `F` prefix followed by 5 digits (e.g., `F58292`).
 3. **Boutique Deletes (Coach Reserve):** Retain their original boutique style number (e.g., `CCX04`), but are reassigned to outlet inventory when transferred.
 
-### B. Hardware Finish Codes (Prefix - 2 Characters)
-Coach compound color codes prepend a 2-character hardware plating finish to the material color code:
-* **`IM`** = Imitation Gold (High-gloss polished brass; standard on factory/outlet items)
-* **`SV`** = Silver (Polished nickel/chrome plating)
-* **`LH`** = Light Gold (Champagne gold; softer hue used in boutiques and elevated outlet pieces)
-* **`B4` / `BP`** = 1941 Heritage Brass / Antique Brass (Burnished, vintage gold-tone common on 1941 and boutique Tabby/Rogue lines)
-* **`QB`** = Gunmetal / Quality Brass (Smoky dark chrome or blackened antique brass)
-* **`GD`** = True Yellow Gold (Vibrant high-karat gold finish)
-* **`V5`** = Vintage Brass / Pewter
-* **`DK`** = Dark Gunmetal / Dark Pewter
+---
+
+### B. Hardware Finish Codes (Prefix - 2 Characters) & Channel Classification
+Coach compound color codes prepend a 2-character hardware plating finish to the material color code. Because hardware plating methods and formulations differ between retail boutique manufacturing and factory outlet mass production, **the hardware prefix serves as the single fastest and most reliable indicator for distinguishing retail from outlet items directly from the color code.**
+
+#### 1. Definitive Factory / Outlet (Made For Factory - MFF) Prefixes
+* **`IM`** = **Imitation Gold (High-gloss polished yellow brass plating):**
+  * **Channel Verdict:** **100% Factory Outlet.**
+  * **Technical Details:** The single most ubiquitous, definitive signature of modern Coach outlet production. Used across almost all outlet leather, coated canvas, and nylon styles (e.g., `IMBLK`, `IMCHK`, `IMDQC`, `IME74`, `IMSAD`).
+  * **Rule:** Mainline retail boutiques do **not** use the `IM` hardware code on modern production. If a code starts with `IM`, the item is guaranteed to be a factory outlet product.
+* **`SVD`** = **Silver / Dark Accents:**
+  * **Channel Verdict:** **Factory Outlet.**
+  * **Technical Details:** Rare outlet-specific tag variant for polished silver hardware with darker tonal accents.
+
+#### 2. Definitive Retail Boutique Prefixes
+* **`B4` / `BP`** = **1941 Heritage Brass / Antique Brass:**
+  * **Channel Verdict:** **Retail Boutique (Full-Price).**
+  * **Technical Details:** The gold standard hallmark of Coach retail boutique bags. Characterized by a burnished, vintage, warm antique brass finish. Standard on flagship lines including the Rogue, Tabby, Bandit, Soft Tabby, Studio, Cassie 19, and the 1941 collection.
+  * **Exception:** Appears at outlet stores **only** if the item is a transferred "Boutique Delete" (Coach Reserve).
+* **`V5`** = **Vintage Brass / Matte Pewter:**
+  * **Channel Verdict:** **Retail Boutique (Full-Price).**
+  * **Technical Details:** Modern boutique-exclusive hardware finish with a muted vintage gold/pewter luster, commonly deployed on contemporary retail boutique silhouettes (e.g., Pillow Tabby, Studio bags, structured shoulder bags).
+* **`GD`** = **True Yellow Gold:**
+  * **Channel Verdict:** **Retail Boutique (Full-Price).**
+  * **Technical Details:** High-shine, high-karat gold plating reserved for select luxury boutique models, premium evening clutches, and elevated retail collections. Distinct from `IM` in quality, depth, and tone.
+* **`RS`** = **Rose Gold:**
+  * **Channel Verdict:** **Retail Boutique (Full-Price).**
+  * **Technical Details:** Boutique retail special-edition hardware finish.
+
+#### 3. Elevated / Skewed Prefixes (Leans Retail)
+* **`LH`** = **Light Gold (Champagne Gold):**
+  * **Channel Verdict:** **Predominantly Retail Boutique (~85-90%).**
+  * **Technical Details:** A soft, pale champagne gold plating. Standard on many modern boutique retail lines (e.g., Willow, Lori, Brooke, Cassie, Cary).
+  * **Nuance:** While occasionally deployed on select higher-tier, elevated outlet pieces, its presence combined with a retail silhouette or rich pebbled leather strongly indicates a boutique retail origin.
+
+#### 4. Dual-Channel / Ambiguous Prefixes (Require Style Number Cross-Check)
+* **`SV`** = **Silver (Polished Nickel / Chrome Plating):**
+  * **Channel Verdict:** **Ambiguous (Used Across Both Channels).**
+  * **Technical Details:** Polished silver hardware is deployed universally across both retail boutiques (e.g., `SV/BK` on retail Tabby or Brooklyn) and factory outlets (e.g., `SV/HA` or `SV/BK` on outlet Gallery Tote or Rowan).
+  * **Rule:** An agent **cannot** infer channel origin from `SV` alone; the style number or creed patch must be checked.
+* **`QB`** = **Gunmetal / Quality Brass (Smoky Dark Chrome / Blackened Antique Brass):**
+  * **Channel Verdict:** **Ambiguous (Used Across Both Channels).**
+  * **Technical Details:** Heavily utilized in both boutique retail men's lines (e.g., Metropolitan, League, Gotham) and factory outlet men's/unisex collections (e.g., Graham, Houston, Warren).
+* **`DK`** = **Dark Gunmetal / Dark Pewter:**
+  * **Channel Verdict:** **Ambiguous (Leans Retail Boutique).**
+  * **Technical Details:** Originally engineered for 1941 runway collections (such as Dinky and Rogue dark hardware), but dark metallic coatings occasionally appear on specialty outlet pieces.
+
+---
 
 ### C. Material & Pattern Color Codes (Suffix - 2 to 5 Characters)
 Appended directly to the hardware prefix (either joined directly or separated by a slash `/` on retail tags):
@@ -68,7 +106,69 @@ Appended directly to the hardware prefix (either joined directly or separated by
 * **`DQC`** = Light Khaki / Chalk (Signature Coated Canvas)
 * **Seasonal Codes** = Alphanumeric combinations (e.g., `F8Q`, `OU9`, `Z1J`, `MS`) representing limited-run seasonal palettes.
 
-### D. Formatting Rules for System Inputs
+#### Signature Canvas Channel Pairings
+While solid leather suffixes (`BK`, `CHK`, `MPL`) are shared across channels, **Signature Coated Canvas compound formulas are heavily segmented:**
+* **Outlet Signature Codes:**
+  * `IMDQC` = Imitation Gold / Light Khaki Chalk (Iconic outlet signature)
+  * `IME74` = Imitation Gold / Khaki Saddle 2
+  * `IMAA8` = Imitation Gold / Brown Black
+  * `SVDK6` = Silver / Black Smoke Black
+  * `IMDJ8` = Imitation Gold / Khaki Chalk Multi
+* **Retail Boutique Signature Codes:**
+  * `B4NQ4` = Brass / Tan Rust (Iconic boutique 1941 signature)
+  * `B4RU` = Brass / Rust
+  * `B4/TN` = Brass / Tan
+  * `B4/HA` = Brass / Chalk Signature Jacquard
+
+---
+
+### D. Automated Channel Triage Protocol (For Agents)
+
+When an agent needs to programmatically determine whether a Coach product is Retail Boutique or Factory Outlet from product strings:
+
+```
+                  [Compound Color Code]
+                            |
+           +----------------+----------------+
+           |                                 |
+      Starts with `IM`?               Starts with `B4`, `BP`,
+           |                          `V5`, `GD`, or `RS`?
+          YES                                |
+           |                                YES
+           v                                 |
+    +---------------+                        v
+    | FACTORY       |                 +---------------+
+    | OUTLET (100%) |                 | RETAIL        |
+    +---------------+                 | BOUTIQUE      |
+                                      +-------+-------+
+                                              |
+                                              v
+                              [Item Found in Outlet Store?]
+                                              |
+                                             YES
+                                              |
+                                              v
+                                      +---------------+
+                                      | BOUTIQUE      |
+                                      | DELETE        |
+                                      | (Coach Reserve|
+                                      | Bullseye Tag) |
+                                      +---------------+
+
+       [If Starts with `LH`]:
+         -> 85-90% probability Retail Boutique.
+         -> Cross-reference Style No. on coach.com vs coachoutlet.com.
+
+       [If Starts with `SV`, `QB`, or `DK`]:
+         -> AMBIGUOUS.
+         -> Check Style Number:
+            - Begins with 'F' + 5 digits -> Outlet (Historical MFF).
+            - Modern alphanumeric (e.g., CCX04, CY201) -> Check PDP endpoint.
+```
+
+---
+
+### E. Formatting Rules for System Inputs
 * **For Adobe Scene7 Image URLs:** Strip all slashes (`/`), remove whitespace, and convert the entire string to lowercase:
   * Style `CCX04`, Color `B4/MPL` $\rightarrow$ `ccx04_b4mpl`.
 * **For Salesforce Commerce Cloud (coach.com):** Preserve case (uppercase), convert spaces to `+`, and URL-encode the forward slash as `%2F`:
@@ -160,14 +260,14 @@ Returns the XML image set declaration:
   </item>
 </set>
 ```
-Reveals that master studio shots are uploaded at **2400 × 2400 pixels**.
+Reveals that master studio shots are uploaded at **2400 Ã— 2400 pixels**.
 
 #### 4. Delivery Profile Properties (`?req=props`)
 ```
 https://images.coach.com/is/image/Coach/cfk02_immpl_a0?req=props
 ```
 Returns basic image processing configurations:
-* Default served canvas size: `1000 × 1000`
+* Default served canvas size: `1000 Ã— 1000`
 * Default JPEG compression quality: `80`
 * Background canvas fill: `0xf0f0f0ff` (hex color `#F0F0F0`)
 * Color space: `sRGB IEC61966-2.1`
@@ -401,7 +501,7 @@ return i.a.createElement(
 | :--- | :--- | :--- | :--- |
 | **Product Images (Hero / Detail)** | Style + Color (`ccx04_b4mpl`) | `https://images.coach.com/is/image/Coach/[style]_[color]_[angle]` | **None.** Open CORS (`*`). Unauthenticated direct GET. |
 | **Angle Existence Check** | Style + Color + Angle | `https://images.coach.com/is/image/Coach/[style]_[color]_[angle]?req=exists` | **None.** Returns 57-byte `catalogRecord.exists=1` or `0`. |
-| **Master Resolution Render** | Style + Color (`2400×2400`) | `https://images.coach.com/is/image/Coach/[style]_[color]_a0?wid=2400&hei=2400&qlt=95` | **None.** Renders native 2400px master asset. |
+| **Master Resolution Render** | Style + Color (`2400Ã—2400`) | `https://images.coach.com/is/image/Coach/[style]_[color]_a0?wid=2400&hei=2400&qlt=95` | **None.** Renders native 2400px master asset. |
 | **Production Lineage & EXIF** | Style + Color | `https://images.coach.com/is/image/Coach/[style]_[color]_a0?req=xmp` | **None.** Returns 40KB XML (lens, serials, edit history). |
 | **Official MSRP, Dimensions, Straps** | Style Number (`CY201`) + optional Color (`B4%2FBK`) | `https://www.coach.com/products/[STYLE].html?frp=[STYLE]+[COLOR]` | **Akamai WAF.** Requires headless browser or scraping gateway. **No slug needed.** |
 | **POS Name, Class, Dept, Bullet Specs** | 12-Digit UPC (`196395712960`) + Store (`4501`) | `https://app.scan.coach.com/api/iteminfo/catalogs/coach-us/stores/[store]/items/[upc]` | **None.** Direct JSON GET. Style+Color combo yields `null`. |
@@ -493,3 +593,4 @@ class CoachCatalogClient:
                 return "catalogRecord.exists=1" in text
         except Exception:
             return False
+```
